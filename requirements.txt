@@ -1,0 +1,4 @@
+opencv-python>=4.8
+opencv-contrib-python>=4.8
+numpy
+scipy

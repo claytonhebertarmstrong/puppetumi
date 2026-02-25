@@ -1,0 +1,18 @@
+{
+  "aruco_dictionary": "DICT_4X4_50",
+  "marker_size_m": 0.03,
+  "markers": {
+    "0": {
+      "position": [0.0, 0.0, 0.05],
+      "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]
+    },
+    "1": {
+      "position": [0.04, 0.0, 0.05],
+      "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]
+    },
+    "2": {
+      "position": [0.0, 0.04, 0.05],
+      "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]
+    }
+  }
+}
