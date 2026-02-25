@@ -18,5 +18,10 @@
       "position": [0.01875, 0.0, -0.010825],
       "quaternion_wxyz": [0.612372, 0.353553, 0.353553, 0.612372]
     }
+  },
+  "reference_point": {
+    "description": "Fingertip relative to ArUco 1",
+    "position": [0.0, 0.014758, -0.175186],
+    "quaternion_wxyz": [1.0, 0.0, 0.0, 0.0]
   }
 }

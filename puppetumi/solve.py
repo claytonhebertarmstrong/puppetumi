@@ -231,12 +231,33 @@ def solve_reference_point(
     reproj_err = np.sqrt(np.mean((projected.reshape(-1, 2) - img_pts_undist) ** 2))
 
     return {
-        "rvec": rvec.squeeze().tolist(),
-        "tvec": tvec.squeeze().tolist(),
+        "rvec": rvec.squeeze(),
+        "tvec": tvec.squeeze(),
         "num_markers_detected": len(known_ids),
         "num_corners_used": n_points,
         "reprojection_error_px": float(reproj_err),
     }
+
+
+def transform_to_reference_point(rvec, tvec, ref_cfg):
+    """Transform from ArUco 1 frame to the reference point (fingertip).
+
+    PnP gives us T_cam_aruco1 (ArUco 1 in camera frame).
+    ref_cfg gives us t_aruco1_ref (reference point in ArUco 1 frame).
+    We compute: p_cam_ref = R_cam_aruco1 @ t_aruco1_ref + t_cam_aruco1
+    """
+    R_cam_aruco1, _ = cv2.Rodrigues(rvec)
+    t_aruco1_ref = np.array(ref_cfg["position"], dtype=np.float64)
+
+    t_cam_ref = R_cam_aruco1 @ t_aruco1_ref + tvec
+
+    # Reference point orientation in camera frame
+    w, x, y, z = ref_cfg["quaternion_wxyz"]
+    R_aruco1_ref = Rotation.from_quat([x, y, z, w]).as_matrix()
+    R_cam_ref = R_cam_aruco1 @ R_aruco1_ref
+    rvec_ref, _ = cv2.Rodrigues(R_cam_ref)
+
+    return rvec_ref.squeeze(), t_cam_ref
 
 
 # ── Main pipeline ─────────────────────────────────────────────────
@@ -250,9 +271,15 @@ def run(args):
     aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT_MAP[cfg["aruco_dictionary"]])
     obj_pts_map = build_object_points(cfg)
 
+    ref_cfg = cfg.get("reference_point")
+
     print(f"Loaded {len(cfg['markers'])} markers from config")
     print(f"ArUco dictionary: {cfg['aruco_dictionary']}")
     print(f"Marker size: {cfg['marker_size_m']*100:.1f} cm")
+    if ref_cfg:
+        print(f"Reference point: {ref_cfg.get('description', 'custom')} at {ref_cfg['position']}")
+    else:
+        print("Reference point: ArUco 1 origin (no reference_point in config)")
 
     images_dir = Path(args.images)
     image_paths = sorted(f for f in images_dir.iterdir() if f.suffix.lower() in IMAGE_EXTS)
@@ -275,18 +302,26 @@ def run(args):
             results.append({"image": img_path.name, "solved": False})
             continue
 
-        tvec = result["tvec"]
+        rvec_out = result["rvec"]
+        tvec_out = result["tvec"]
+
+        # Transform to fingertip / reference point if configured
+        if ref_cfg:
+            rvec_out, tvec_out = transform_to_reference_point(
+                result["rvec"], result["tvec"], ref_cfg
+            )
+
         print(
             f"  [{i+1}/{len(image_paths)}] {img_path.name}: "
-            f"pos=({tvec[0]:+.4f}, {tvec[1]:+.4f}, {tvec[2]:+.4f}) m, "
+            f"pos=({tvec_out[0]:+.4f}, {tvec_out[1]:+.4f}, {tvec_out[2]:+.4f}) m, "
             f"{result['num_markers_detected']} markers, "
             f"reproj={result['reprojection_error_px']:.2f} px"
         )
         results.append({
             "image": img_path.name,
             "solved": True,
-            "reference_point_position_m": tvec,
-            "reference_point_rvec": result["rvec"],
+            "reference_point_position_m": tvec_out.tolist(),
+            "reference_point_rvec": rvec_out.tolist(),
             "num_markers_detected": result["num_markers_detected"],
             "num_corners_used": result["num_corners_used"],
             "reprojection_error_px": result["reprojection_error_px"],
